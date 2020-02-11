@@ -1,0 +1,197 @@
+---
+title: "Lab 4"
+author: "Stephanie Gluck"
+date: "2/10/2020"
+output: 
+  html_document: 
+    theme: cerulean
+---
+
+```{r setup}
+
+library(rio)
+library(tidyverse)
+library(ggplot2)
+library(here)
+library(colorblindr)
+library(scales)
+
+#saving these for future reference 
+#devtools::install_github("wilkelab/cowplot")
+#install.packages("colorspace", repos = "http://R-Forge.R-project.org")
+#devtools::install_github("clauswilke/colorblindr")
+#remotes::install_github("tidyverse/ggplot2")
+#install.packages("colorblindr")
+
+theme_set(theme_minimal())
+```
+
+```{r load_data}
+
+pth <- here("honeyproduction.csv")
+d <- import(pth)
+
+state <- rio::import("https://github.com/cphalpert/census-regions/raw/master/us%20census%20bureau%20regions%20and%20divisions.csv") 
+
+```
+
+## Honey Visualization 
+
+Total produciton of honey (million pounds) across years by state. Using color to highlight the west coast (Washington, Oregon, and California).
+
+```{r plot1, fig.width = 8, fig.height = 7}
+head(d)
+
+d <- arrange(d, -totalprod)
+
+p <- ggplot(d, aes(fct_rev(as_factor(state)), totalprod/10^6)) + 
+  geom_col(fill = "#a6611a") + 
+  geom_col(data = filter(d, 
+                         state == "OR" |
+                           state == "WA"|
+                           state == "CA"), 
+           fill = "#018571") +
+  scale_y_continuous(labels = scales::unit_format(unit = "M"), 
+                     expand = c(0, 0, 0.05, 0)) +
+  theme(panel.grid.major.y = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        plot.title.position = "plot") +
+  coord_flip() + 
+  labs(x = "",
+       y = "Honey Production (million pounds)",
+       title = "Total Honey Production by State")
+p
+
+```
+
+Reproduce the plot according three different kinds of color blindness, as well as a desaturated version.
+
+```{r plot1_colorblind_test}
+
+colorblindr::cvd_grid(p)
+
+```
+
+Color blind safe palette 
+
+```{r plot1_colorblind_safe, fig.width = 8, fig.height = 7}
+
+p1_colorsafe <- ggplot(d, aes(fct_rev(as_factor(state)), totalprod/10^6)) + 
+  geom_col(fill = "#1f78b4") + 
+  geom_col(data = filter(d, 
+                         state == "OR" |
+                           state == "WA"|
+                           state == "CA"), 
+           fill = "#a6cee3") +
+  theme(panel.grid.major.y = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        plot.title.position = "plot") +
+  scale_y_continuous(labels = unit_format(unit = "M"), 
+                     expand = c(0, 0, 0.05, 0)) +
+  coord_flip() + 
+  labs(x = "",
+       y = "Honey Production (million pounds)",
+       title = "Total Honey Production by State")
+
+p1_colorsafe
+
+```
+
+Check plot for colorblind friendliness 
+
+```{r plot1_colorblind_safe_test}
+
+colorblindr::cvd_grid(p1_colorsafe)
+
+```
+
+
+## Honey State Visualization 
+
+Join file 
+
+```{r join_file}
+
+state <- state %>% rename(state = `State Code`)
+
+d_state <- left_join(d, state)
+
+head(d_state)
+
+```
+
+
+Total produciton of honey (million pounds) across years by state. Using color to highlight region of the country the state is from. 
+
+```{r plot2, fig.width = 8, fig.height = 7}
+
+ggplot(d_state, aes(reorder(state, totalprod), totalprod/10^6)) + 
+  geom_col(aes(fill = Region)) +
+  scale_fill_OkabeIto() +
+  scale_y_continuous(labels = unit_format(unit = "M"), 
+                     expand = c(0, 0, 0.05, 0)) +
+  theme(panel.grid.major.y = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        plot.title.position = "plot") +
+  coord_flip() + 
+  labs(x = "",
+       y = "Honey Production (million pounds)",
+       title = "Total Honey Production by State") 
+
+```
+
+**Summary**: A bulk majority of the country's honey is produced by North Dakota, California and South Dakota and two of these states are in the Midwest region (ND & SD) of the United States. Honey production for ND and SD combined is around 700 million pounds with CA produciton at about 350 million pounds. The region with the smallest total honey production is the Northeast of the United States. 
+
+
+## Honey Production Heatmap by Region 
+
+Average honey production across years by region
+
+```{r heatmap, fig.width = 8, fig.height = 6}
+
+d_heat <- d_state %>% group_by(Region, year) %>%  
+  summarise(production = mean(totalprod))
+
+head(d_heat)
+
+ggplot(d_heat, aes(year, Region)) + 
+  geom_tile(aes(fill = production/10^6)) + 
+  theme_minimal(base_size = 15) +
+  scale_fill_viridis_c(option = "magma") +
+  theme(legend.position = "bottom", 
+        plot.title = element_text(hjust = 0.5), 
+        legend.title.align = 0.5) +
+  labs(x = "",
+       y = "",
+       title = "Average Honey Production Across Years by Region", 
+       fill = "Honey Production \n(million pounds)")
+
+```
+
+## Additional Honey Production Visualization 
+
+```{r plot3, fig.width = 8, fig.height = 6}
+
+ggplot(d_heat, aes(year,production/10^6, color = Region)) + 
+  geom_line(size = 1.5) + 
+  geom_point(size = 2.5) +
+  theme_minimal(base_size = 15) +
+  scale_color_viridis_d(name = "") + 
+  theme(panel.grid.major.y = element_blank(), 
+        plot.title.position = "plot") +
+  scale_y_continuous(labels = unit_format(unit = "M", accuracy = 1), 
+                     expand = c(0.05, 0, 0.05, 0)) +
+  labs(x = "",
+       y = "Honey Production (million pounds)",
+       title = "Average Honey Production Across Years by Region") + 
+  geom_text(data = filter(d_heat, year == "2012"), 
+            aes(y = production/10^6, label = Region), 
+            color = "gray20", 
+            nudge_x = 0.3, 
+            hjust = 0, 
+            size = 5) + 
+  guides(color = "none") + 
+  xlim(NA, 2014)
+
+```
+
